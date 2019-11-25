@@ -60,7 +60,7 @@ class PodcastArchiver:
     _userAgent = 'Podcast-Archiver/0.4 (https://github.com/janwh/podcast-archiver)'
     _headers = {'User-Agent': _userAgent}
     _global_info_keys = ['author', 'language', 'link', 'subtitle', 'title', ]
-    _episode_info_keys = ['author', 'link', 'subtitle', 'title', ]
+    _episode_info_keys = ['author', 'link', 'subtitle', 'title', 'image']
     _date_keys = ['published', ]
 
     savedir = ''
@@ -199,6 +199,7 @@ class PodcastArchiver:
         # Try different feed episode layouts: 'items' or 'entries'
         episodeList = feed.get('items', False) or feed.get('entries', False)
         if episodeList:
+            print('==> collect a list')
             linklist = [self.parseEpisode(episode) for episode in episodeList]
             linklist = [link for link in linklist if len(link) > 0]
         else:
@@ -220,6 +221,17 @@ class PodcastArchiver:
                     for key in self._episode_info_keys + self._date_keys:
                         episode_info[key] = episode.get(key, None)
                     episode_info['url'] = url
+                    episode_info['uuid'] = path.basename(urlparse(episode_info['link']).path).split('.')[0]
+                    episode_info['id3tag'] = {
+                        'artist':   'Sebastian Mangelsen',
+                        'composer': 'Erich Krüger',
+                        'title': 'Erster Akt',
+                        'album': PodcastArchiver.slugifyString('my album'),
+                        'genre': 'AudioBook',
+                        'year': '2019',
+                        'track': 99,
+                        'total': 100
+                    }
 
         return episode_info
 
@@ -368,6 +380,8 @@ class PodcastArchiver:
 
                 if self.verbose > 1:
                     print("\t✓ Download successful.")
+                    import json
+                    print(print (json.dumps(episode_dict, indent=2)))
             except (urllib.error.HTTPError,
                     urllib.error.URLError) as error:
                 if self.verbose > 1:
