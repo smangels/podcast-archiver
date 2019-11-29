@@ -37,6 +37,7 @@ from urllib.parse import urlparse
 import unicodedata
 import re
 import xml.etree.ElementTree as etree
+from tinydb import TinyDB, Query
 
 
 class writeable_dir(argparse.Action):
@@ -75,6 +76,7 @@ class PodcastArchiver:
     def __init__(self):
 
         feedparser.USER_AGENT = self._userAgent
+        self.db = TinyDB('.podcast_archiver.db.json')
 
     def addArguments(self, args):
 
@@ -381,7 +383,10 @@ class PodcastArchiver:
                 if self.verbose > 1:
                     print("\t✓ Download successful.")
                     import json
+                    episode_dict['filename'] = filename
                     print(print (json.dumps(episode_dict, indent=2)))
+                    self.updateDatabase(episode_dict)
+                    self.updateMp3Tags(episode_dict)
             except (urllib.error.HTTPError,
                     urllib.error.URLError) as error:
                 if self.verbose > 1:
@@ -392,6 +397,16 @@ class PodcastArchiver:
 
                 remove(filename)
                 raise
+
+    def updateDatabase(self, episode_dict):
+
+        self.db.insert({'uuid': episode_dict['uuid'], 'path': episode_dict['filename']})
+        if self.verbose > 1:
+            print('\t=> update DB')
+
+    def updateMp3Tags(self, episode_dict):
+        if self.verbose > 1:
+            print('\t=> update MP3 tags')
 
     def prettyCopyfileobj(self, fsrc, fdst, callback, block_size=8 * 1024):
         while True:
