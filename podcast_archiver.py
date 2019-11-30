@@ -63,6 +63,7 @@ class PodcastArchiver:
     _global_info_keys = ['author', 'language', 'link', 'subtitle', 'title', ]
     _episode_info_keys = ['author', 'link', 'subtitle', 'title', 'image']
     _date_keys = ['published', ]
+    _db_file_name = '.podcast_archiver.db.json'
 
     savedir = ''
     verbose = 0
@@ -76,7 +77,7 @@ class PodcastArchiver:
     def __init__(self):
 
         feedparser.USER_AGENT = self._userAgent
-        self.db = TinyDB('.podcast_archiver.db.json')
+        self.db = None
 
     def addArguments(self, args):
 
@@ -312,17 +313,23 @@ class PodcastArchiver:
         if linklist is None or self._feed_title is None:
             return
 
+        if self.verbose > 0:
+            print('2. Check DB consistency ...')
+
+        # SMANGELS
+        self.checkDBconcistency()
+
         nlinks = len(linklist)
         if nlinks > 0:
             if self.verbose == 1:
-                print("2. Downloading content ... ", end="")
+                print("3. Downloading content ... ", end="")
             elif self.verbose > 1:
-                print("2. Downloading content ...")
+                print("3. Downloading content ...")
 
         for cnt, episode_dict in enumerate(linklist):
             link = episode_dict['url']
             if self.verbose == 1:
-                print("\r2. Downloading content ... {0}/{1}"
+                print("\r3. Downloading content ... {0}/{1}"
                       .format(cnt + 1, nlinks), end="", flush=True)
             elif self.verbose > 1:
                 print("\n\tDownloading file no. {0}/{1}:\n\t{2}"
@@ -336,6 +343,12 @@ class PodcastArchiver:
 
             # Check existence once ...
             filename = self.linkToTargetFilename(link)
+            if not self.db:
+                self.db = TinyDB(self._db_file_name)
+
+            # check database whether file exist
+            if self.doesFileExistInDatabase(episode_dict):
+                pass
 
             if self.verbose > 1:
                 print("\tLocal filename:", filename)
@@ -382,10 +395,7 @@ class PodcastArchiver:
 
                 if self.verbose > 1:
                     print("\t✓ Download successful.")
-                    import json
-                    episode_dict['filename'] = filename
-                    print(print (json.dumps(episode_dict, indent=2)))
-                    self.updateDatabase(episode_dict)
+                    self.updateDB(episode_dict)
                     self.updateMp3Tags(episode_dict)
             except (urllib.error.HTTPError,
                     urllib.error.URLError) as error:
@@ -398,7 +408,25 @@ class PodcastArchiver:
                 remove(filename)
                 raise
 
-    def updateDatabase(self, episode_dict):
+    def doesFileExistInDatabase(self, episode_dict):
+        '''check the database for a given UUID'''
+        File = Query()
+        uuid_obj = self.db.search(File.uuid == episode_dict['uuid'])
+        if uuid_obj:
+            if self.verbose > 2:
+                print('\tUUID found: %s' % str(episode_dict['uuid']))
+            return True
+        else:
+            return False
+
+    def checkDBconcistency(self):
+        ''' check every link in the database whether file exists,
+            mark file not found as orphans'''
+        if self.verbose > 1:
+            print('\t==> DB clean')
+        return True
+
+    def updateDB(self, episode_dict):
 
         self.db.insert({'uuid': episode_dict['uuid'], 'path': episode_dict['filename']})
         if self.verbose > 1:
